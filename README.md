@@ -1,54 +1,100 @@
-# ELINTgen
-Synthetic ELINT Generation from Vessel Tracks
+# ELINTgen: Synthetic ELINT Generation from Vessel Tracks
 
+`ELINTgen` is a lightweight, modular Python toolkit for generating synthetic ELINT detections from real or simulated vessel tracks (e.g., AIS). It supports configurable sensor and emitter profiles, spatial error modeling, and interactive visualization, and is designed for prototyping multi-INT fusion pipelines.
 
-`ELINTgen` is a modular simulation toolkit for generating synthetic ELINT detections based on real or simulated vessel tracks (e.g., AIS). It supports multi-sensor, multi-emitter scenarios with configurable error, sampling, and fusion complexity.
+> ⚠️ This code is intended for **research and prototyping purposes only** — not operational use.
 
 ---
 
-## ✨ Features
+## 🔧 Core Features
 
 - Cubic spline interpolation of AIS tracks
-- Configurable ELINT sensors (satellite, shore, drone, etc.)
-- Emission models for different emitter types (civilian, military, dual-use)
-- Positional error modeling with bearing-based or random biases
-- Plotting utilities for AIS tracks, splines, detections, and error ellipses
-- GeoJSON-based masking and region visualization
+- Configurable ELINT sensors (shore, satellite, drone)
+- Emitter models for civilian, military, or dual-use behavior
+- Positional error modeling with directional uncertainty
+- Plotly-based visualization of tracks and detections
+- GeoJSON filtering and masking for regional analysis
+- YAML-driven scenario configuration and complexification
 
 ---
 
-## 🔬 Scenario Complexity Framework (Multi-INT)
+## 🗂️ Module Overview
 
-ELINTgen now supports the simulation of complex, realistic data environments for testing fusion systems. Scenarios are defined using **YAML configuration files** that specify a base track set, sensor/emitter types, and layered **complexity modules**.
-
-### 🔧 Complexity Modules
-
-Each module represents a realism injector and can be applied individually or in sequence.
-
-#### 🛰 Goal 1: Co-travel / Overlap
-
-| ID | Name | Description |
-|----|------|-------------|
-| `parallel_tracks` | Creates a nearby vessel with similar heading/speed |
-| `merge_split_tracks` | Simulates a single vessel splitting into two or merging |
-| `shadow_track` | Creates a lagged copy of another track |
-
-#### 🆔 Goal 2: Identifier Inconsistency
-
-| ID | Name | Description |
-|----|------|-------------|
-| `missing_ids` | Drops MMSI, vessel name, or type from some records |
-| `typo_ids` | Introduces small errors in identifier fields |
-| `reused_ids` | Assigns the same identifier to different tracks |
-
-#### ⏱ Goal 3: Varying Data Quality
-
-| ID | Name | Description |
-|----|------|-------------|
-| `sensor_lag` | Adds delay to timestamps for a sensor type |
-| `timestamp_quantization` | Rounds timestamps to nearest fixed interval |
-| `reporting_gaps` | Drops detections within spatial/temporal zones |
+| Component | Description |
+|----------|-------------|
+| `generate_elint_detections_from_spline` | Generate detections from spline-interpolated tracks |
+| `SENSOR_PROFILES`, `EMITTER_PROFILES`  | Define sensor and emitter characteristics |
+| `compute_bearing`, `offset_position`   | Geographic math utilities |
+| `load_geojson`, `plot_geojson_file`    | Load and visualize GeoJSON regions |
+| `mask_elint_by_geojson`                | Filter detections within polygons |
+| `add_ais_tracks`, `add_spline`         | Visualize AIS tracks and splines |
+| `add_elint_detections`                 | Plot detections and error ellipses |
+| `init_map`                             | Initialize a Plotly Mapbox map view |
 
 ---
 
-## 🧱 YAML Scenario Format
+## 🚀 Quickstart Example
+
+```python
+from elintgen import (
+    generate_elint_detections_from_spline,
+    SENSOR_PROFILES,
+    EMITTER_PROFILES
+)
+import pandas as pd
+
+track_df = pd.read_csv("example_track.csv")  # Must include Timestamp, Latitude, Longitude, TrackID
+
+elint_df, lat_spline, lon_spline = generate_elint_detections_from_spline(
+    track_df,
+    sensor_type="shore",
+    emitter_type="military",
+    sensor_profiles=SENSOR_PROFILES,
+    emitter_profiles=EMITTER_PROFILES
+)
+```
+
+## 📊 Visualization Example
+
+```python
+from elintgen import init_map, add_ais_tracks, add_elint_detections
+
+fig = init_map()
+fig = add_ais_tracks(track_df, fig=fig)
+fig = add_elint_detections(elint_df, fig=fig)
+fig.show()
+```
+
+# 🔬 Scenario Complexity Framework
+
+`ELINTgen` supports complex, realistic environments for testing fusion and tracking systems. You can define scenarios in YAML that apply one or more complexity modules to AIS or ELINT data.
+
+## 🔧 Complexity Modules
+
+Each module introduces a type of realism, ambiguity, or degradation in the data.
+
+### 🛰 Goal 1: Co-travel / Overlapping Tracks
+
+| ID                 | Description                                      |
+|--------------------|--------------------------------------------------|
+| `parallel_tracks`  | Adds a nearby vessel with similar heading/speed |
+| `merge_split_tracks` | Splits or merges vessels mid-track             |
+| `shadow_track`     | Creates a lagged copy of another track          |
+
+### 🆔 Goal 2: Identifier Inconsistency
+
+| ID             | Description                                |
+|----------------|--------------------------------------------|
+| `missing_ids`  | Removes MMSI, name, or call sign fields    |
+| `typo_ids`     | Introduces character-level typos           |
+| `reused_ids`   | Assigns new ID to vessels   |
+
+### ⏱ Goal 3: Varying Data Quality
+
+| ID                     | Description                                      |
+|------------------------|--------------------------------------------------|
+| `sensor_lag`           | Adds random lag to detection timestamps          |
+| `timestamp_quantization` | Rounds detection times to fixed intervals     |
+| `reporting_gaps`       | Removes detections within a defined region       |
+
+
