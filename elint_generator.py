@@ -76,7 +76,7 @@ def generate_elint_detections_from_spline(track_df, sensor_type, emitter_type, s
 
         elint_records.append({
             'detector_id': f"{sensor_type}_{detector_id}",
-            'track_id': track_df['TrackID'].iloc[0],
+            'TrackID': track_df['TrackID'].iloc[0],
             'detection_time': timestamp,
             'true_lat': lat,
             'true_lon': lon,

@@ -3,6 +3,8 @@ import pandas as pd
 import plotly.express as px
 from shapely.geometry import shape, Point, Polygon
 import geopandas as gpd
+import numpy as np
+from scipy.interpolate import CubicSpline
 
 def load_geojson(filename):
     """Load GeoJSON file and return parsed object."""
@@ -145,6 +147,85 @@ def mask_elint_by_geojson(elint_df, geojson_file, lat_col="detected_lat", lon_co
 
     mask = elint_df.apply(inside, axis=1)
     return ~mask if invert else mask
+
+
+
+def extract_region_subtracks(
+    df, region_geojson,
+    lat_col="Latitude", lon_col="Longitude", time_col="Timestamp", id_col="mmsi",
+    resample_interval_sec=600
+):
+    """
+    Given sparse AIS data, fit a spline to each MMSI track, resample it,
+    and extract only the contiguous subtracks fully within a GeoJSON-defined region.
+
+    All original metadata fields are copied into the resampled output where possible.
+    """
+    region_geom = shape(region_geojson["features"][0]["geometry"])
+    df = df.copy()
+    df[time_col] = pd.to_datetime(df[time_col])
+    df = df.sort_values([id_col, time_col])
+
+    all_subtracks = []
+    global_track_counter = 0
+
+    for mmsi, group in df.groupby(id_col):
+        group = group.copy()
+
+        if len(group) < 4:
+            continue  # not enough points to spline
+
+        t = group[time_col].astype(np.int64) / 1e9  # seconds since epoch
+        lat = group[lat_col].values
+        lon = group[lon_col].values
+
+        try:
+            lat_spline = CubicSpline(t, lat)
+            lon_spline = CubicSpline(t, lon)
+        except Exception:
+            continue  # skip if spline fails
+
+        # Resample timestamps
+        t_min, t_max = t.min(), t.max()
+        t_resampled = np.arange(t_min, t_max, resample_interval_sec)
+        timestamps_resampled = pd.to_datetime(t_resampled, unit='s')
+        lat_resampled = lat_spline(t_resampled)
+        lon_resampled = lon_spline(t_resampled)
+
+        df_resampled = pd.DataFrame({
+            "Timestamp": timestamps_resampled,
+            "Latitude": lat_resampled,
+            "Longitude": lon_resampled,
+            id_col: mmsi
+        })
+
+        # Copy static fields from the first row of the original group
+        static_data = group.iloc[0].drop([lat_col, lon_col, time_col], errors="ignore")
+        for col in static_data.index:
+            df_resampled[col] = static_data[col]
+
+        # Point-in-polygon test
+        df_resampled["InRegion"] = df_resampled.apply(
+            lambda row: region_geom.contains(Point(row["Longitude"], row["Latitude"])),
+            axis=1
+        )
+
+        # Group by contiguous InRegion blocks
+        in_region = df_resampled["InRegion"]
+        change_ids = (in_region != in_region.shift()).cumsum()
+        for _, segment in df_resampled.groupby(change_ids):
+            if segment["InRegion"].all():
+                segment = segment.copy()
+                segment["TrackID"] = f"{mmsi}_{global_track_counter}"
+                global_track_counter += 1
+                all_subtracks.append(segment)
+
+    if all_subtracks:
+        return pd.concat(all_subtracks, ignore_index=True)
+    else:
+        return pd.DataFrame(columns=df.columns.tolist() + ["TrackID"])
+
+
 
 def coords_to_geojson_polygon(coords, name="GeneratedPolygon"):
     """

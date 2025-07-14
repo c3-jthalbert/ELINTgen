@@ -6,6 +6,7 @@ from .geojson_utils import (
     load_geojson,
     plot_geojson_file,
     plot_geojson_polygon,
+    extract_region_subtracks,
     mask_elint_by_geojson
 )
 from .plot_utils import (
@@ -25,6 +26,7 @@ __all__ = [
     "plot_geojson_file",
     "plot_geojson_polygon",
     "mask_elint_by_geojson",
+    "extract_region_subtracks",
     "add_ais_tracks",
     "add_spline",
     "add_elint_detections",
