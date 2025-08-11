@@ -1,5 +1,5 @@
 # __init__.py
-from .elint_generator import generate_elint_detections_from_spline
+from .elint_generator import generate_elint_detections_from_spline, generate_elint_for_all_emitters
 from .geom_utils import compute_bearing, offset_position
 from .profiles import SENSOR_PROFILES, EMITTER_PROFILES
 from .geojson_utils import (
@@ -18,6 +18,7 @@ from .plot_utils import (
 
 __all__ = [
     "generate_elint_detections_from_spline",
+    "generate_elint_for_all_emitters",
     "compute_bearing",
     "offset_position",
     "SENSOR_PROFILES",
